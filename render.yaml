@@ -1,0 +1,9 @@
+# Render.com free deployment config (https://render.com)
+services:
+  - type: web
+    name: preguntados-27002
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: node server.js
+    healthCheckPath: /

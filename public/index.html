@@ -1,0 +1,875 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Preguntados ISO/IEC 27002 · Online</title>
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background: radial-gradient(circle at 50% 20%, #1b2a4a 0%, #0d1526 70%);
+    min-height: 100vh; display: flex; justify-content: center; align-items: center;
+    color: #fff; padding: 16px;
+  }
+  .app { width: 100%; max-width: 600px; }
+  .screen { display: none; text-align: center; }
+  .screen.active { display: block; }
+
+  .logo {
+    font-size: 32px; font-weight: 900; letter-spacing: 1px;
+    background: linear-gradient(90deg,#ffd700,#ff8c00,#ffd700);
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent; margin-bottom: 4px;
+  }
+  .sub { color: #9fb4d8; margin-bottom: 22px; font-size: 14px; }
+
+  input[type=text] {
+    width: 100%; max-width: 320px; padding: 13px 16px; border-radius: 12px;
+    border: 1px solid #2c3d66; background: #20304f; color: #fff;
+    font-size: 16px; text-align: center; margin-bottom: 12px; outline: none;
+  }
+  input[type=text]:focus { border-color: #ffd700; }
+  input.uppercase { text-transform: uppercase; letter-spacing: 4px; font-weight: 800; }
+
+  .btn {
+    display: inline-block; border: none; cursor: pointer; padding: 14px 34px;
+    border-radius: 40px; font-size: 17px; font-weight: 700; color: #0d1526;
+    background: linear-gradient(90deg,#ffd700,#ffb347);
+    box-shadow: 0 4px 18px rgba(255,180,60,.4); transition: transform .15s; margin: 4px;
+  }
+  .btn:hover { transform: scale(1.05); }
+  .btn:disabled { opacity: .45; cursor: default; transform: none; }
+  .btn.secondary { background: #3a4d73; color: #fff; box-shadow: none; font-size: 14px; padding: 10px 22px; }
+  .btn.ghost { background: transparent; color: #9fb4d8; border: 1px solid #2c3d66; box-shadow: none; font-size: 14px; padding: 10px 22px; }
+  .row { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+  .err { color: #ff9aa5; font-size: 13px; min-height: 18px; margin-bottom: 6px; }
+
+  .roombox {
+    font-size: 46px; font-weight: 900; letter-spacing: 10px; color: #ffd700;
+    background: #17233f; border: 2px dashed #ffd700; border-radius: 16px;
+    padding: 12px; display: inline-block; margin: 8px 0 6px;
+  }
+  .playercount { color: #9fb4d8; font-size: 14px; margin-bottom: 12px; }
+
+  .hud { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; gap: 6px; flex-wrap: wrap; }
+  .score { background: #17233f; border: 1px solid #2c3d66; border-radius: 12px; padding: 6px 12px; font-size: 13px; font-weight: 700; }
+
+  .board {
+    background: #101a30; border: 1px solid #2c3d66; border-radius: 14px;
+    padding: 10px 14px; margin-bottom: 12px; text-align: left;
+  }
+  .board .title { font-size: 12px; letter-spacing: 1px; color: #9fb4d8; font-weight: 700; margin-bottom: 6px; text-transform: uppercase; }
+  .brow { display: flex; justify-content: space-between; padding: 3px 0; font-size: 14px; }
+  .brow.me { color: #ffd700; font-weight: 800; }
+  .brow .pts { color: #9fb4d8; font-weight: 700; }
+  .tag { display: inline-block; font-size: 10px; background: #ffd700; color: #0d1526; border-radius: 10px; padding: 1px 7px; margin-left: 6px; font-weight: 800; }
+
+  .wheel-wrap { text-align: center; margin: 6px 0 14px; }
+  .wheel {
+    width: 180px; height: 180px; margin: 0 auto; position: relative; border-radius: 50%;
+    border: 8px solid #ffd700; box-shadow: 0 0 30px rgba(255,215,0,.25);
+    display: flex; align-items: center; justify-content: center;
+    transition: transform 1.6s cubic-bezier(.1,.7,.1,1);
+    background: conic-gradient(#2e9be0 0deg 90deg, #38b6a0 90deg 180deg, #f0536b 180deg 270deg, #9b6dd6 270deg 360deg);
+  }
+  .wheel.spinning { transform: rotate(1260deg); }
+  .wheel-center {
+    width: 108px; height: 108px; border-radius: 50%; background: #0d1526; border: 4px solid #ffd700;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 800; text-transform: uppercase; line-height: 1.2;
+  }
+
+  .card { background: #17233f; border: 1px solid #2c3d66; border-radius: 18px; padding: 18px 18px 14px; box-shadow: 0 10px 30px rgba(0,0,0,.35); }
+  .cat-chip { display: inline-block; padding: 4px 14px; border-radius: 30px; font-size: 12px; font-weight: 800; letter-spacing: .5px; letter-spacing: .5px; }
+
+  .timer { position: relative; height: 24px; border-radius: 12px; background: #101a30; border: 1px solid #2c3d66; overflow: hidden; margin-top: 12px; }
+  .timer-fill { height: 100%; width: 100%; background: linear-gradient(90deg, #ffd700, #ff8c00); }
+  .timer-fill.low { background: linear-gradient(90deg, #e0342f, #ff6b5e); }
+  .timer-text {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 13px; color: #fff; letter-spacing: 1px;
+    text-shadow: 0 1px 2px rgba(0,0,0,.7);
+  }
+  .qtext { font-size: 16px; line-height: 1.45; margin: 14px 0 16px; min-height: 60px; text-align: left; }
+  .opts { display: grid; gap: 10px; }
+  .opt {
+    text-align: left; cursor: pointer; border: 1px solid #2c3d66; background: #20304f;
+    color: #eaf1ff; border-radius: 12px; padding: 12px 14px; font-size: 15px;
+    transition: background .15s, transform .1s;
+  }
+  .opt:hover { background: #2a3e66; }
+  .opt.correct { background: #1f9d55; border-color: #1f9d55; }
+  .opt.wrong { background: #d63044; border-color: #d63044; }
+  .opt:disabled { cursor: default; opacity: .7; }
+
+  .feed { margin-top: 14px; font-size: 13px; text-align: left; max-height: 120px; overflow-y: auto; }
+  .feed div { padding: 2px 0; color: #9fb4d8; }
+  .feed .good { color: #74e0a4; }
+  .feed .bad { color: #ff9aa5; }
+  .feed .first { color: #ffd700; font-weight: 700; }
+
+  .nextrow { margin-top: 12px; text-align: center; }
+  .footer { margin-top: 16px; color: #5a6f96; font-size: 12px; text-align: center; }
+  .end-emoji { font-size: 58px; }
+  .end-title { font-size: 28px; font-weight: 900; margin: 8px 0 4px; }
+  .end-sub { color: #9fb4d8; margin-bottom: 16px; }
+  .podium { list-style: none; text-align: left; max-width: 360px; margin: 0 auto; }
+  .podium li { display: flex; justify-content: space-between; background: #17233f; border: 1px solid #2c3d66; border-radius: 12px; padding: 10px 14px; margin-bottom: 8px; font-size: 15px; }
+  .podium li.me { border-color: #ffd700; }
+  .podium .medal { margin-right: 8px; }
+  .muted { color: #5a6f96; font-size: 12px; margin-top: 6px; }
+
+  .panel { display: none; }
+  .panel.active { display: block; }
+  .chip { display: inline-block; padding: 4px 14px; border-radius: 30px; font-size: 12px; font-weight: 800; letter-spacing: .5px; }
+  .phaseBar { background:#17233f; border:1px solid #2c3d66; border-radius:12px; padding:8px 14px; margin-bottom:10px; text-align:left; font-size:13px; }
+  .phaseBar .note { color:#9fb4d8; margin-top:2px; font-size:12px; }
+
+  .p2opt { display:flex; align-items:center; justify-content:space-between; }
+  .p2opt small { color:#9fb4d8; font-size:11px; }
+
+  .opt.selected { background:#ffd700; color:#0d1526; border-color:#ffd700; font-weight:800; }
+  .opt.mine-correct { background:#1f9d55; border-color:#1f9d55; }
+  .opt.mine-wrong { background:#d63044; border-color:#d63044; }
+
+  .p4top { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; font-size:15px; }
+  .p4top .money { color:#ffd700; font-weight:900; }
+  .shopitem { display:flex; justify-content:space-between; align-items:center; gap:10px; text-align:left; }
+  .shopitem .sinfo { flex:1; }
+  .shopitem .sname { font-weight:700; font-size:14px; }
+  .shopitem .sdesc { color:#9fb4d8; font-size:11px; }
+  .shopitem .sprice { color:#ffd700; font-weight:800; white-space:nowrap; }
+  .bought { opacity:.5; }
+  .p4owned { margin-top:10px; font-size:12px; color:#9fb4d8; text-align:left; }
+
+  .attackbox { border:1px dashed #e8a33d; border-radius:12px; padding:10px 12px; margin-bottom:10px; text-align:left; }
+  .attackbox .aname { color:#ffd700; font-weight:800; }
+  .attackbox.outcome-ok { border-color:#1f9d55; background:rgba(31,157,85,.12); }
+  .attackbox.outcome-bad { border-color:#d63044; background:rgba(214,48,68,.12); }
+  .attackbox .outcome { font-weight:800; font-size:14px; }
+
+  #phaseOverlay {
+    position:fixed; inset:0; z-index:50; display:none;
+    align-items:center; justify-content:center; text-align:center;
+    background:rgba(8,13,24,.92); padding:24px;
+  }
+  #phaseOverlay .picon { font-size:64px; }
+  #phaseOverlay .pname { font-size:26px; font-weight:900; margin:12px 0 6px; }
+  #phaseOverlay .pdesc { color:#9fb4d8; max-width:460px; line-height:1.5; }
+  #phaseOverlay .ptag { margin-top:16px; color:#ffd700; font-weight:700; letter-spacing:2px; font-size:12px; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- Pantalla 1: Inicio -->
+  <div id="screenStart" class="screen active">
+    <div class="logo">PREGUNTADOS</div>
+    <div class="sub">ISO/IEC 27002 · 5 fases · Preguntados · Clasificador · Auditoría · Cyber Crisis · Debate</div>
+    <input type="text" id="nameInput" maxlength="18" placeholder="Tu nombre">
+    <br>
+    <button class="btn" onclick="createRoom()">Crear sala</button>
+    <div class="row" style="margin-top:10px;">
+      <input type="text" id="codeInput" class="uppercase" maxlength="4" placeholder="CÓDIGO" style="width:120px;">
+      <button class="btn secondary" onclick="joinRoom()">Unirme</button>
+    </div>
+    <div class="err" id="startErr"></div>
+  </div>
+
+  <!-- Pantalla 2: Lobby -->
+  <div id="screenLobby" class="screen">
+    <div class="logo" style="font-size:20px;">SALA LISTA</div>
+    <div class="roombox" id="roomCode">----</div>
+    <div class="playercount" id="playerCount"></div>
+    <div class="board">
+      <div class="title">Jugadores</div>
+      <div id="lobbyPlayers"></div>
+    </div>  
+    <br>
+    <button class="btn" id="startBtn" style="display:none;" onclick="emitStart()">Empezar partida</button>
+    <div class="muted" id="startHint" style="display:none;">Necesitas al menos 1 jugador para comenzar.</div>
+    <button class="btn secondary" id="waitingBtn" disabled style="display:block; margin:4px auto;">Esperando al anfitrión...</button>
+    <div class="muted">El anfitrión inicia la partida cuando todos estén listos.</div>
+  </div>
+
+  <!-- Pantalla 3: Juego -->
+  <div id="screenGame" class="screen">
+    <div class="hud">
+      <div class="score" id="phaseTag">🧭 Fase 1/5</div>
+      <div class="score" id="scoreWrap">Puntos: <span id="myPoints">0</span></div>
+      <div class="score" id="modTag" style="display:none;">👑 Anfitrión</div>
+    </div>
+    <div class="board" id="board">
+      <div class="title">Marcador en vivo</div>
+      <div id="boardRows"></div>
+    </div>
+    <div class="timer" id="gameTimer" style="display:none;">
+      <div class="timer-fill" id="timerFill"></div>
+      <span class="timer-text" id="timerText">0 s</span>
+    </div>
+    <div class="muted" id="timerLabel" style="margin-bottom:4px;"></div>
+
+    <div id="p1panel" class="panel active">
+      <div class="wheel-wrap">
+        <div class="wheel" id="wheel"><div class="wheel-center">Gira la<br>rueda</div></div>
+        <br>
+        <button class="btn" id="wheelBtn" onclick="spin()">Girar la rueda 🎡</button>
+        <div class="muted" id="notHostMsg" style="display:none;">El anfitrión está girando la rueda…</div>
+      </div>
+      <div class="card" id="questionCard" style="display:none;">
+        <span class="cat-chip" id="catChip">Categoría</span>
+        <div class="qtext" id="qtext"></div>
+        <div class="opts" id="opts"></div>
+        <div class="muted" id="p1Rem"></div>
+      </div>
+    </div>
+
+    <div id="p2panel" class="panel">
+      <div class="card">
+        <span class="chip" id="p2Chip" style="background:#38b6a0;">🗂️ Sorting Express · Clasificador de Controles</span>
+        <div class="qtext" id="p2Text"></div>
+        <div class="opts" id="p2Opts"></div>
+      </div>
+    </div>
+
+    <div id="p3panel" class="panel">
+      <div class="card">
+        <span class="chip" id="p3Chip" style="background:#9b6dd6;">🕵️ Caza de Vulnerabilidades · Audita la Escena</span>
+        <div class="qtext" id="p3Title"></div>
+        <div class="muted" id="p3Intro" style="margin-bottom:10px;"></div>
+        <div class="opts" id="p3Controls"></div>
+        <div class="row" style="margin-top:12px;">
+          <button class="btn secondary" id="p3Reset" onclick="p3ResetPicks()">Limpiar</button>
+          <button class="btn" id="p3Confirm" onclick="p3Confirm()">Confirmar selección ✅</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="p4panel" class="panel">
+      <div class="card">
+        <span class="chip" style="background:#e8a33d;">🛡️ Cyber Crisis</span>
+        <div class="p4top">
+          <span>Presupuesto:</span><span class="money">💵 <span id="p4Budget">$0</span></span>
+        </div>
+        <div id="p4AttackBox" class="attackbox">
+          <span class="aname" id="p4AtkName">Preparando…</span>
+          <div class="muted" id="p4AtkDesc"></div>
+        </div>
+        <div class="opts" id="p4Shop"></div>
+        <div class="p4owned" id="p4Owned"></div>
+        <div class="row" style="margin-top:10px;">
+          <button class="btn" id="p4ReadyBtn" onclick="p4Ready()">✔️ Listo, ejecutar ataque</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="p5panel" class="panel">
+      <div class="card">
+        <span class="chip" style="background:#f0536b;">🗣️ Debate Express · Ventajas vs. Limitaciones</span>
+        <div style="font-size:40px; margin:10px 0 4px;">💬</div>
+        <div class="qtext" id="p5Text"></div>
+        <div class="opts" id="p5Opts"></div>
+      </div>
+    </div>
+
+    <div class="muted" id="hostNote" style="display:none; margin-top:10px;">👑 El anfitrión no juega: observa cómo responden los jugadores.</div>
+    <div class="feed" id="feed"></div>
+  </div>
+
+  <!-- Overlay de cambio de fase -->
+  <div id="phaseOverlay">
+    <div>
+      <div class="picon" id="phaseOverlayIcon">🎯</div>
+      <div class="pname" id="phaseOverlayName">FASE 1</div>
+      <div class="pdesc" id="phaseOverlayDesc"></div>
+      <div class="ptag" id="phaseOverlayTag"></div>
+    </div>
+  </div>
+
+  <!-- Pantalla 4: Fin -->
+  <div id="screenEnd" class="screen">
+    <div class="end-emoji" id="endEmoji">🏆</div>
+    <div class="end-title" id="endTitle">¡Victoria!</div>
+    <div class="end-sub" id="endSub"></div>
+    <ol class="podium" id="podium"></ol>
+    <br>
+    <button class="btn" onclick="location.reload()">Volver al inicio</button>
+  </div>
+
+</div>
+
+<script>
+// ---------- Estado del cliente ----------
+const socket = io();
+let myId = null;
+let myName = '';
+let isHost = false;
+let roomCode = '';
+let currentQId = null;
+let spinTimer = null;
+let timerInt = null;
+let myChoseValue = null;
+let questionActive = false;
+let spinning = false;
+let overlayTimer = null;
+let myPhase = 1;
+let p2Cid = null;
+let p2Answered = false;
+let p3Sid = null;
+let p3Picks = new Set();
+let p5Sid = null;
+let p5Voted = false;
+
+socket.on('connect', () => { myId = socket.id; });
+
+// ---------- Utilidades ----------
+const $ = id => document.getElementById(id);
+function show(n) { document.querySelectorAll('.screen').forEach(s => s.classList.remove('active')); $(n).classList.add('active'); }
+function cleanName() {
+  myName = $('nameInput').value.trim().slice(0, 18) || 'Jugador';
+  $('nameInput').value = myName;
+  return myName;
+}
+function renderBoard(players) {
+  const sorted = [...players].sort((a, b) => b.points - a.points);
+  $('boardRows').innerHTML = sorted.map(p => `
+    <div class="brow ${p.id === myId ? 'me' : ''}">
+      <span>${p.id === myId ? '⭐ ' : ''}${esc(p.name)}${p.id === myId ? ' <span class="tag">TÚ</span>' : ''}</span>
+      <span class="pts">${p.points} pts</span>
+    </div>`).join('');
+  const mine = sorted.find(p => p.id === myId);
+  if (mine) { $('myPoints').textContent = mine.points; }
+}
+function esc(t){ return String(t).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+// ---------- Inicio ----------
+function createRoom() {
+  cleanName();
+  if (!$('nameInput').value) { $('startErr').textContent = 'Escribe tu nombre primero.'; return; }
+  socket.emit('createRoom', myName, (res) => {
+    if (!res.ok) { $('startErr').textContent = res.msg; return; }
+    setupLobby(res);
+  });
+}
+function joinRoom() {
+  cleanName();
+  const code = $('codeInput').value.trim().toUpperCase();
+  if (code.length < 4) { $('startErr').textContent = 'Ingresa el código de 4 letras de la sala.'; return; }
+  socket.emit('joinRoom', { code, name: myName }, (res) => {
+    if (!res.ok) { $('startErr').textContent = res.msg; return; }
+    setupLobby(res);
+  });
+}
+
+function setupLobby(res) {
+  roomCode = res.code;
+  isHost = res.hostId === myId;
+  $('roomCode').textContent = res.code;
+  renderLobby(res.players, res.hostId);
+  show('screenLobby');
+}
+function renderLobby(players, hostId) {
+  isHost = hostId === myId;
+  const guests = players.filter(p => p.id !== hostId);
+  $('playerCount').textContent = `👑 Anfitrión + ${guests.length} jugador(es)`;
+  $('lobbyPlayers').innerHTML = players.map(p => `
+    <div class="brow ${p.id === myId ? 'me' : ''}">${p.name}${p.id === hostId ? ' <span class="tag">👑 Anfitrión</span>' : ''}${p.id === myId ? ' <span class="tag">TÚ</span>' : ''}</div>`).join('');
+  if (isHost) {
+    $('startBtn').style.display = 'inline-block';
+    $('startBtn').disabled = guests.length < 1;
+    $('startHint').style.display = guests.length < 1 ? 'block' : 'none';
+    $('waitingBtn').style.display = 'none';
+  } else {
+    $('startBtn').style.display = 'none';
+    $('startHint').style.display = 'none';
+    $('waitingBtn').style.display = 'block';
+  }
+}
+function emitStart() { if (isHost) socket.emit('start'); }
+function copyLink() {
+  const url = location.origin + location.pathname + '?room=' + roomCode;
+  if (navigator.clipboard) navigator.clipboard.writeText(url);
+  else prompt('Copia este enlace:', url);
+}
+
+// ---------- Eventos del servidor ----------
+socket.on('lobbyUpdate', (d) => { renderLobby(d.players, d.hostId); });
+socket.on('players', (d) => { isHost = d.hostId === myId; updateSpinBtn(); updateModUI(); renderBoard(d.players); });
+
+socket.on('started', () => {
+  $('feed').innerHTML = '';
+  $('questionCard').style.display = 'none';
+  questionActive = false;
+  spinning = false;
+  myPhase = 1;
+  stopGameTimer();
+  showPhasePanel(1);
+  updateSpinBtn();
+  updateModUI();
+  updatePhaseUI();
+  resetWheel();
+  show('screenGame');
+  myPoints(0);
+});
+
+socket.on('phase', (d) => {
+  myPhase = d.phase;
+  $('feed').innerHTML = '';
+  stopGameTimer();
+  p2Answered = false; p3Picks = new Set(); p5Voted = false;
+  showPhasePanel(d.phase);
+  updatePhaseUI();
+  showPhaseOverlay(d);
+});
+
+socket.on('question', (d) => {
+  currentQId = d.qId;
+  myChoseValue = null;
+  const chip = $('catChip');
+  chip.textContent = d.catName;
+  chip.style.background = d.catColor;
+  const wheel = $('wheel');
+  wheel.style.background = `radial-gradient(circle, #0d1526 40%, ${d.catColor} 100%)`;
+  wheel.innerHTML = `<div class="wheel-center" style="border-color:${d.catColor}; color:${d.catColor}">${d.catName}</div>`;
+  $('qtext').textContent = d.q;
+  const optsEl = $('opts');
+  optsEl.innerHTML = '';
+  d.options.forEach((text, i) => {
+    const b = document.createElement('button');
+    b.className = 'opt';
+    b.textContent = String.fromCharCode(65 + i) + ') ' + text;
+    b.onclick = () => answer(i);
+    optsEl.appendChild(b);
+  });
+  $('feed').innerHTML = '';
+  addFeed(`🎯 Fase 1 · Pregunta ${d.round}/${d.total}. +100 al primero, +50 a los demás, -20 si fallas.`, '');
+  $('questionCard').style.display = 'block';
+  $('hostNote').style.display = isHost ? 'block' : 'none';
+  $('p1Rem').textContent = 'Pregunta ' + d.round + ' de ' + d.total + ' ' + (isHost ? '· gira la rueda cuando terminéis.' : '· elige tu respuesta.');
+  questionActive = true;
+  spinning = false;
+  if (spinTimer) { clearTimeout(spinTimer); spinTimer = null; }
+  updateSpinBtn();
+  document.querySelectorAll('#opts .opt').forEach(b => b.disabled = isHost);
+  startGameTimer(d.time, '⚡ Responde la pregunta de la Fase 1');
+});
+
+socket.on('answered', (d) => {
+  const cls = d.correct ? (d.first ? 'first' : 'good') : 'bad';
+  const pts = d.earned >= 0 ? '+' + d.earned : d.earned;
+  const txt = d.correct
+    ? `${esc(d.name)} respondió correcto ${d.first ? `y fue el PRIMERO (${pts} pts 🥇)` : `(${pts} pts)`}`
+    : `${esc(d.name)} respondió mal (${pts} pts 💔)`;
+  addFeed(txt, cls);
+});
+
+// ---------- Fase 2: Sorting Express ----------
+socket.on('p2Card', (d) => {
+  p2Cid = d.cid;
+  p2Answered = false;
+  $('p2Text').textContent = d.text;
+  const optsEl = $('p2Opts');
+  optsEl.innerHTML = '';
+  d.options.forEach((o) => {
+    const b = document.createElement('button');
+    b.className = 'opt p2opt';
+    b.innerHTML = `<span>${esc(o.name)}</span><small>${esc(o.tip)}</small>`;
+    b.onclick = () => p2Classify(o.id);
+    optsEl.appendChild(b);
+  });
+  setPhaseButtons('#p2Opts .opt', !isHost);
+  startGameTimer(d.time, '🗂️ ¿A qué categoría pertenece el control?');
+});
+socket.on('p2Answer', (d) => {
+  const pts = d.earned >= 0 ? '+' + d.earned : d.earned;
+  addFeed(`🗂️ ${esc(d.name)} ${d.correct ? 'clasificó bien' : 'falló'} (${pts} pts)`, d.correct ? 'good' : 'bad');
+});
+socket.on('p2Reveal', (d) => {
+  stopGameTimer();
+  const btns = document.querySelectorAll('#p2Opts .opt');
+  const optIdx = idx => d.options.findIndex(o => o.id === idx);
+  const correctIdx = optIdx(d.catId);
+  btns.forEach((b, i) => {
+    b.disabled = true;
+    b.classList.remove('mine-correct', 'mine-wrong');
+  });
+  if (correctIdx >= 0 && btns[correctIdx]) btns[correctIdx].classList.add('correct');
+  const mine = d.results.find(r => r.id === myId);
+  if (mine && !mine.correct) {
+    const mi = optIdx(mine.catId);
+    if (mi >= 0 && btns[mi]) btns[mi].classList.add('mine-wrong');
+  }
+  d.results.forEach(r => {
+    addFeed(`🗂️ ${esc(r.name)} ${r.correct ? 'acertó' : 'erró'} (${r.earned >= 0 ? '+' + r.earned : r.earned} pts)`, r.correct ? 'good' : 'bad');
+  });
+});
+
+// ---------- Fase 3: Caza de Vulnerabilidades ----------
+socket.on('p3Scene', (d) => {
+  p3Sid = d.sid;
+  p3Picks = new Set();
+  $('p3Title').textContent = d.title;
+  $('p3Intro').textContent = d.text;
+  const list = $('p3Controls');
+  list.innerHTML = '';
+  d.controls.forEach((c) => {
+    const b = document.createElement('button');
+    b.className = 'opt';
+    b.textContent = c.text;
+    b.dataset.id = c.id;
+    b.onclick = () => p3Toggle(c.id, b);
+    list.appendChild(b);
+  });
+  $('p3Reset').disabled = isHost;
+  $('p3Confirm').disabled = isHost;
+  if (isHost) startGameTimer(d.time, '🕵️ Los jugadores seleccionan sus controles');
+  else startGameTimer(d.time, '🕵️ Selecciona los controles adecuados y confirma');
+});
+socket.on('p3Submit', (d) => {
+  addFeed(`🕵️ ${esc(d.name)} confirmó su selección (${d.earned >= 0 ? '+' + d.earned : d.earned} pts)`, d.earned >= 0 ? 'good' : 'bad');
+  if (d.id === myId) {
+    document.querySelectorAll('#p3Controls .opt').forEach(b => b.disabled = true);
+    $('p3Confirm').disabled = true;
+    $('p3Reset').disabled = true;
+  }
+});
+socket.on('p3Reveal', (d) => {
+  stopGameTimer();
+  document.querySelectorAll('#p3Controls .opt').forEach(b => b.disabled = true);
+  d.needed.forEach(id => {
+    const el = document.querySelector('#p3Controls .opt[data-id="' + id + '"]');
+    if (el) el.classList.add('correct');
+  });
+  if (!isHost) p3Picks.forEach(id => {
+    if (!d.needed.includes(id)) {
+      const el = document.querySelector('#p3Controls .opt[data-id="' + id + '"]');
+      if (el) el.classList.add('wrong');
+    }
+  });
+  d.results.forEach(r => addFeed(`🕵️ ${esc(r.name)} obtuvo ${r.earned >= 0 ? '+' + r.earned : r.earned} pts`, r.earned >= 0 ? 'good' : 'bad'));
+});
+
+// ---------- Fase 4: SOC Manager ----------
+let p4ShopData = [];
+let p4StateByMe = { budget: 10000, purchased: [] };
+let p4AttackOpen = false;
+let p4ReadySent = false;
+
+function setP4ReadyBtn() {
+  const b = $('p4ReadyBtn');
+  if (!b) return;
+  if (isHost) { b.style.display = 'none'; return; }
+  b.style.display = 'inline-block';
+  b.disabled = p4ReadySent || !p4AttackOpen;
+  b.textContent = p4ReadySent ? '⏳ Esperando a los demás…' : '✔️ Listo, ejecutar ataque';
+}
+function p4Ready() {
+  if (isHost || p4ReadySent || !p4AttackOpen) return;
+  p4ReadySent = true;
+  setP4ReadyBtn();
+  renderP4Shop();
+  socket.emit('p4Ready');
+}
+
+function shopName(id) {
+  const s = p4ShopData.find(x => x.id === id);
+  return s ? s.name : id;
+}
+function renderP4Shop() {
+  const list = $('p4Shop');
+  if (!list) return;
+  list.innerHTML = '';
+  p4ShopData.forEach(s => {
+    const b = document.createElement('button');
+    b.className = 'opt shopitem';
+    const own = p4StateByMe.purchased.includes(s.id);
+    const afford = s.price <= p4StateByMe.budget;
+    b.innerHTML = `<span class="sinfo"><span class="sname">${own ? '✅ ' : ''}${esc(s.name)}</span><br><span class="sdesc">${esc(s.desc)}</span></span><span class="sprice">$${s.price.toLocaleString('es')}</span>`;
+    b.disabled = own || !afford || isHost || !p4AttackOpen || p4ReadySent;
+    if (own) b.classList.add('bought');
+    if (!own && afford && !isHost && p4AttackOpen && !p4ReadySent) b.onclick = () => socket.emit('p4Buy', { cid: s.id });
+    list.appendChild(b);
+  });
+  setP4ReadyBtn();
+}
+function renderP4State(players) {
+  const me = players.find(p => p.id === myId);
+  if (!me) return;
+  p4StateByMe = me;
+  $('p4Budget').textContent = '$' + me.budget.toLocaleString('es');
+  $('p4Owned').textContent = me.purchased.length ? 'Controles activos: ' + me.purchased.map(shopName).join(', ') : 'Aún no has comprado controles.';
+  renderP4Shop();
+}
+socket.on('p4Init', (d) => {
+  p4ShopData = d.shop;
+  p4AttackOpen = false;
+  p4ReadySent = false;
+  renderP4State(d.state);
+  setP4ReadyBtn();
+  $('p4AtkName').textContent = 'Preparando defensas…';
+  $('p4AtkDesc').textContent = 'Van a ocurrir 3 ataques en tiempo real. Cuando se anuncie uno, tendrás 90 s para comprar el control preventivo.';
+  $('p4AttackBox').className = 'attackbox';
+});
+socket.on('p4Notify', (d) => {
+  p4AttackOpen = true;
+  p4ReadySent = false;
+  $('p4AtkName').textContent = '⚠️ PRÓXIMO ATAQUE — ' + d.name;
+  $('p4AtkDesc').textContent = d.desc + ' | Mitiga con: ' + d.required.map(shopName).join(' o ');
+  $('p4AttackBox').className = 'attackbox';
+  renderP4Shop();
+  startGameTimer(d.time, '🛡️ Compra el control preventivo antes del ataque');
+});
+socket.on('p4Buy', (d) => {
+  addFeed(`🛡️ ${esc(d.name)} compró un control (le quedan $${d.budget.toLocaleString('es')})`, '');
+});
+socket.on('p4Ready', (d) => {
+  addFeed(`🛡️ ${esc(d.name)} está listo para el ataque`, '');
+});
+socket.on('p4State', (d) => { renderP4State(d.players); });
+socket.on('p4Result', (d) => {
+  stopGameTimer();
+  p4AttackOpen = false;
+  p4ReadySent = false;
+  setP4ReadyBtn();
+  const mineRes = d.results.find(r => r.id === myId);
+  const mineMit = mineRes && mineRes.mitigated;
+  const box = $('p4AttackBox');
+  box.className = 'attackbox ' + (mineMit ? 'outcome-ok' : 'outcome-bad');
+  $('p4AtkName').textContent = mineMit ? '✅ ' + d.name + ' MITIGADO' : '🔥 ' + d.name + ': BREACHA DE SEGURIDAD';
+  $('p4AtkDesc').textContent = mineMit
+    ? 'Compraste el control preventivo adecuado: +150 pts.'
+    : 'No tenías el control adecuado: -100 pts y perdiste presupuesto.';
+  d.results.forEach(r => addFeed(`🛡️ ${esc(r.name)} ${r.mitigated ? 'mitigó el ataque' : 'sufrió la brecha'} (${r.delta >= 0 ? '+' + r.delta : r.delta} pts)`, r.mitigated ? 'good' : 'bad'));
+  renderP4Shop();
+});
+
+// ---------- Fase 5: Debate Express ----------
+const P5_VOTES = ['ventaja', 'limitacion', 'mito'];
+socket.on('p5Statement', (d) => {
+  p5Sid = d.sid;
+  p5Voted = false;
+  $('p5Text').textContent = d.text;
+  const optsEl = $('p5Opts');
+  optsEl.innerHTML = '';
+  const labels = { ventaja: '✅ Ventaja', limitacion: '⚠️ Limitación', mito: '❌ Mito / Falso' };
+  const hints = { ventaja: 'Es positivo para la norma', limitacion: 'Dificulta o resta valor', mito: 'No es cierto' };
+  P5_VOTES.forEach(v => {
+    const b = document.createElement('button');
+    b.className = 'opt';
+    b.innerHTML = `${labels[v]}<small style="display:block;color:#9fb4d8;font-size:11px;">${hints[v]}</small>`;
+    b.onclick = () => p5Vote(v);
+    optsEl.appendChild(b);
+  });
+  setPhaseButtons('#p5Opts .opt', !isHost);
+  startGameTimer(d.time, '🗣️ Vota: ¿ventaja, limitación o mito?');
+});
+socket.on('p5Reveal', (d) => {
+  stopGameTimer();
+  const btns = document.querySelectorAll('#p5Opts .opt');
+  const correctIdx = P5_VOTES.indexOf(d.answer);
+  btns.forEach(b => { b.disabled = true; b.classList.remove('mine-correct', 'mine-wrong'); });
+  if (correctIdx >= 0 && btns[correctIdx]) btns[correctIdx].classList.add('correct');
+  const mine = d.results.find(r => r.id === myId);
+  if (mine && mine.vote && !mine.correct) {
+    const mi = P5_VOTES.indexOf(mine.vote);
+    if (mi >= 0 && btns[mi]) btns[mi].classList.add('mine-wrong');
+  }
+  d.results.forEach(r => addFeed(`🗣️ ${esc(r.name)} votó ${r.vote || '—'} (${r.earned >= 0 ? '+' + r.earned : r.earned} pts)`, r.correct ? 'good' : 'bad'));
+  addFeed('💡 Correcto: ' + d.answer + '. ' + d.explanation, 'first');
+});
+
+// ---------- Acciones de fases ----------
+function setPhaseButtons(sel, enabled) { document.querySelectorAll(sel).forEach(b => b.disabled = !enabled); }
+function p2Classify(catId) {
+  if (isHost || p2Answered || !p2Cid) return;
+  p2Answered = true;
+  setPhaseButtons('#p2Opts .opt', false);
+  socket.emit('p2Classify', { cid: p2Cid, catId });
+}
+function p3Toggle(id, b) {
+  if (isHost || !p3Sid) return;
+  if (p3Picks.has(id)) { p3Picks.delete(id); b.classList.remove('selected'); }
+  else { p3Picks.add(id); b.classList.add('selected'); }
+}
+function p3ResetPicks() {
+  if (isHost) return;
+  p3Picks.clear();
+  document.querySelectorAll('#p3Controls .opt').forEach(b => b.classList.remove('selected'));
+}
+function p3Confirm() {
+  if (isHost || !p3Sid) return;
+  $('p3Confirm').disabled = true;
+  $('p3Reset').disabled = true;
+  document.querySelectorAll('#p3Controls .opt').forEach(b => b.disabled = true);
+  socket.emit('p3Submit', { sid: p3Sid, picks: Array.from(p3Picks) });
+}
+function p5Vote(v) {
+  if (isHost || p5Voted || !p5Sid) return;
+  p5Voted = true;
+  setPhaseButtons('#p5Opts .opt', false);
+  socket.emit('p5Vote', { sid: p5Sid, vote: v });
+}
+
+socket.on('questionEnded', (d) => {
+  stopGameTimer();
+  const btns = document.querySelectorAll('#opts .opt');
+  btns.forEach((b) => b.disabled = true);
+  if (btns[d.rightIndex]) btns[d.rightIndex].classList.add('correct');
+  const mine = d.results.find(r => r.id === myId);
+  if (mine && !mine.correct && myChoseValue !== null && btns[myChoseValue]) btns[myChoseValue].classList.add('wrong');
+  questionActive = false;
+  updateSpinBtn(); // el anfitrión puede girar de nuevo
+});
+
+socket.on('wheelReady', () => {
+  if ($('questionCard')) $('questionCard').style.display = 'none';
+  questionActive = false;
+  resetWheel();
+});
+
+socket.on('gameEnd', (d) => {
+  stopGameTimer();
+  $('phaseOverlay').style.display = 'none';
+  show('screenEnd');
+  const top = d.players[0];
+  const won = d.won && top && top.id === myId;
+  $('endEmoji').textContent = won ? '🏆' : '🎖️';
+  $('endTitle').textContent = '¡Partida terminada!';
+  $('endSub').textContent = top
+    ? (top.id === myId ? '¡Felicidades, ganaste la partida!' : `El ganador fue ${esc(top.name)}.`)
+    : 'La partida terminó.';
+  const medals = ['🥇','🥈','🥉'];
+  $('podium').innerHTML = d.players.map((p, i) => `
+    <li class="${p.id === myId ? 'me' : ''}">
+      <span><span class="medal">${medals[i] || '⭐'}</span>${esc(p.name)}${p.id === myId ? ' (tú)' : ''}</span>
+      <span>${p.points} pts</span>
+    </li>`).join('');
+});
+
+// ---------- Acciones ----------
+function spin() {
+  if (!isHost) return;
+  if (questionActive) return;
+  if (spinTimer) return;
+  socket.emit('spin');
+  startSpinAnim();
+}
+function updateSpinBtn() {
+  const b = $('wheelBtn');
+  const msg = $('notHostMsg');
+  if (myPhase !== 1 || !isHost) {
+    b.style.display = 'none';
+    b.disabled = true;
+    msg.style.display = myPhase === 1 ? 'block' : 'none';
+    return;
+  }
+  b.style.display = 'inline-block';
+  b.disabled = questionActive || spinning;
+  msg.style.display = 'none';
+}
+function updateModUI() {
+  $('scoreWrap').style.display = isHost ? 'none' : 'inline-block';
+  $('modTag').style.display = isHost ? 'inline-block' : 'none';
+}
+function startSpinAnim() {
+  spinning = true;
+  const wheel = $('wheel');
+  wheel.classList.remove('spinning');
+  void wheel.offsetWidth;
+  wheel.classList.add('spinning');
+  updateSpinBtn();
+  if (spinTimer) clearTimeout(spinTimer);
+  spinTimer = setTimeout(resetWheel, 2600);
+}
+function resetWheel() {
+  if (spinTimer) { clearTimeout(spinTimer); spinTimer = null; }
+  spinning = false;
+  const wheel = $('wheel');
+  wheel.classList.remove('spinning');
+  wheel.style.background = 'conic-gradient(#2e9be0 0deg 90deg, #38b6a0 90deg 180deg, #f0536b 180deg 270deg, #9b6dd6 270deg 360deg)';
+  wheel.innerHTML = '<div class="wheel-center">Gira la<br>rueda</div>';
+  updateSpinBtn();
+}
+function answer(i) {
+  if (isHost) return;
+  if (!currentQId) return;
+  if (myChoseValue !== null) return;
+  myChoseValue = i;
+  document.querySelectorAll('#opts .opt').forEach(b => b.disabled = true);
+  socket.emit('answer', { qId: currentQId, index: i });
+}
+function stopGameTimer() {
+  if (timerInt) { clearInterval(timerInt); timerInt = null; }
+  $('gameTimer').style.display = 'none';
+  $('timerLabel').textContent = '';
+}
+function startGameTimer(sec, label) {
+  stopGameTimer();
+  const endsAt = Date.now() + sec * 1000;
+  const fill = $('timerFill');
+  const txt = $('timerText');
+  $('gameTimer').style.display = 'block';
+  $('timerLabel').textContent = label || '';
+  const tick = () => {
+    const remain = Math.max(0, endsAt - Date.now());
+    const s = Math.ceil(remain / 1000);
+    txt.textContent = s + ' s';
+    fill.style.width = Math.round(remain / (sec * 1000) * 100) + '%';
+    fill.classList.toggle('low', remain < 5000);
+    if (remain <= 0) stopGameTimer();
+  };
+  tick();
+  timerInt = setInterval(tick, 100);
+}
+
+// ---------- Fases ----------
+const PANELS = ['p1', 'p2', 'p3', 'p4', 'p5'];
+function showPhasePanel(n) {
+  const panel = 'p' + n + 'panel';
+  PANELS.forEach(p => { const el = $(p + 'panel'); if (el) el.classList.toggle('active', p + 'panel' === panel); });
+}
+function showPhaseOverlay(d) {
+  $('phaseOverlayIcon').textContent = d.icon;
+  $('phaseOverlayName').textContent = 'FASE ' + d.phase + ' · ' + d.name + '';
+  $('phaseOverlayDesc').textContent = d.desc;
+  $('phaseOverlay').style.display = 'flex';
+  clearTimeout(overlayTimer);
+  overlayTimer = setTimeout(() => { $('phaseOverlay').style.display = 'none'; }, 2800);
+}
+function phaseGuide(n) {
+  return {
+    1: '👑 Moderas la Fase 1: gira la rueda y observa cómo responden los jugadores.',
+    2: '👑 Observa cómo clasifican los jugadores. +50 acierto, -30 fallo.',
+    3: '👑 Observa cómo seleccionan los controles. +30 cada control correcto, -20 fallos, +50 bono si es limpio.',
+    4: '👑 Observa compras y ataques. +150 por mitigar, -100 por brecha.',
+    5: '👑 Observa los votos. +40 correcto, -15 incorrecto.'
+  }[n] || '';
+}
+function updatePhaseUI() {
+  $('phaseTag').textContent = '🧭 Fase ' + myPhase + '/5';
+  const note = $('hostNote');
+  note.textContent = phaseGuide(myPhase);
+  note.style.display = isHost ? 'block' : 'none';
+}
+function addFeed(txt, cls) {
+  const f = $('feed');
+  const d = document.createElement('div');
+  d.innerHTML = txt;
+  if (cls) d.className = cls;
+  f.appendChild(d);
+  f.scrollTop = f.scrollHeight;
+  while (f.children.length > 8) f.removeChild(f.firstChild);
+}
+function myPoints(n) { $('myPoints').textContent = n; }
+
+// ---------- Arranque con ?room= ----------
+(function () {
+  const params = new URLSearchParams(location.search);
+  const room = params.get('room');
+  if (room) { $('codeInput').value = room.toUpperCase(); }
+})();
+</script>
+</body>
+</html>
