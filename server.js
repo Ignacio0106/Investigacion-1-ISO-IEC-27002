@@ -60,6 +60,12 @@ function shuffle(arr) {
   return a;
 }
 
+// Mezcla las opciones de una pregunta para que la correcta no esté siempre en la misma posición
+function shuffledQuestion(q) {
+  const order = shuffle(q.opts.map((_, i) => i));
+  return { options: order.map(i => q.opts[i]), a: order.indexOf(q.a) };
+}
+
 function createRoom(hostSocketId, hostName) {
   const code = genCode();
   const room = {
@@ -177,10 +183,11 @@ function p2Send(room) {
   const card = room.p2.cards[room.p2.idx];
   room.p2.cid = card.cid;
   room.p2.answers = new Map();
+  room.p2.options = shuffle(P2_OPTIONS.map(o => ({ id: o.id, name: o.name, tip: o.tip, color: o.color })));
   io.to(room.code).emit('p2Card', {
     cid: card.cid,
     text: card.text,
-    options: P2_OPTIONS.map(o => ({ id: o.id, name: o.name, tip: o.tip })),
+    options: room.p2.options,
     time: P2_TIME / 1000,
     endsAt: Date.now() + P2_TIME
   });
@@ -198,7 +205,7 @@ function p2Reveal(room) {
     const a = room.p2.answers.get(id);
     results.push({ id, name: p.name, catId: a ? a.catId : null, correct: !!(a && a.correct), earned: a ? a.earned : 0 });
   }
-  io.to(room.code).emit('p2Reveal', { catId: card.cat, options: P2_OPTIONS.map(o => ({ id: o.id, name: o.name, color: o.color })), results });
+  io.to(room.code).emit('p2Reveal', { catId: card.cat, options: room.p2.options.map(o => ({ id: o.id, name: o.name, color: o.color })), results });
   broadcastRoom(room);
   room.p2.idx++;
   if (room.p2.idx < room.p2.cards.length) later(room, () => { if (room.phase === 2 && room.p2) p2Send(room); }, 1800);
@@ -287,6 +294,12 @@ function p4Next(room) {
   const atk = room.p4.attacks[room.p4.round];
   room.p4.buyOpen = true;
   room.p4.ready = new Map();
+  // Cada caso se reinicia: nuevo presupuesto completo y sin controles comprados previos
+  for (const data of room.p4.players.values()) {
+    data.budget = P4_BUDGET;
+    data.purchased = new Set();
+  }
+  io.to(room.code).emit('p4State', { players: p4StateList(room) });
   io.to(room.code).emit('p4Notify', {
     attackId: atk.id,
     name: atk.name,
@@ -374,7 +387,7 @@ function closeQuestion(room) {
   const cur = room.current;
   cur.closed = true;
   clearTimeout(cur.closeTimer);
-  const rightIndex = QUESTIONS[cur.catId][cur.qIndex].a;
+  const rightIndex = cur.shufA;
   const results = [];
   for (const [id, p] of room.players) {
     if (id === room.host) continue; // el anfitrión no juega
@@ -451,10 +464,12 @@ io.on('connection', (socket) => {
     if (!picked) { endGame(room, true); return; }
     const q = QUESTIONS[picked.catId][picked.qIndex];
     const cat = CATS.find(c => c.id === picked.catId);
+    const sq = shuffledQuestion(q);
     room.current = {
       catId: picked.catId,
       qIndex: picked.qIndex,
       q,
+      shufA: sq.a,
       answered: new Map(),
       firstCorrect: null,
       closed: false,
@@ -466,7 +481,7 @@ io.on('connection', (socket) => {
       catName: cat.name,
       catColor: cat.color,
       q: q.q,
-      options: q.opts,
+      options: sq.options,
       time: ANSWER_TIME / 1000,
       endsAt,
       round: room.p1.count + 1,
@@ -487,7 +502,7 @@ io.on('connection', (socket) => {
 
     const player = room.players.get(socket.id);
     if (!player) return;
-    const correct = index === cur.q.a;
+    const correct = index === cur.shufA;
     let earned = 0;
     if (correct) {
       if (!cur.firstCorrect) { cur.firstCorrect = socket.id; earned = CORRECT_FIRST; }

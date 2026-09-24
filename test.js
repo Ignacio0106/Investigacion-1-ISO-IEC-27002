@@ -1,10 +1,20 @@
 const { io } = require('socket.io-client');
+const { QUESTIONS } = require('./questions');
 const URL = process.env.URL || 'http://localhost:3000';
 
 const watchdog = setTimeout(() => { console.error('FATAL: timeout del test'); process.exit(1); }, 25000);
 
 function wait(ms) { return new Promise(r => setTimeout(r, ms)); }
 function once(sock, ev) { return new Promise(r => sock.once(ev, r)); }
+
+// Con el orden de opciones mezclado, calcula la posición de la respuesta correcta en el payload recibido
+function correctIdx(qPayload) {
+  const dash = qPayload.qId.lastIndexOf('-');
+  const catId = qPayload.qId.slice(0, dash);
+  const qIndex = Number(qPayload.qId.slice(dash + 1));
+  const q = QUESTIONS[catId][qIndex];
+  return qPayload.options.indexOf(q.opts[q.a]);
+}
 
 (async () => {
   let failed = 0;
@@ -53,9 +63,10 @@ function once(sock, ev) { return new Promise(r => sock.once(ev, r)); }
   ok('la pregunta trae tiempo de respuesta (20 s con endsAt)', q1.time === 20 && q1.endsAt > Date.now());
 
   // el invitado responde primero y correcto (+100) -> es la PRIMERA respuesta válida
+  const a1Correct = correctIdx(q1);
   const hostAnswered = once(host, 'answered');
   const guestAnswered1 = once(guest, 'answered');
-  guest.emit('answer', { qId: q1.qId, index: 0 });
+  guest.emit('answer', { qId: q1.qId, index: a1Correct });
   const a1 = await guestAnswered1;
   await hostAnswered;
   ok('invitado primero en acertar -> first + earned 100', a1.correct === true && a1.first === true && a1.earned === 100);
@@ -69,7 +80,7 @@ function once(sock, ev) { return new Promise(r => sock.once(ev, r)); }
   ok('el anfitrión NO juega (su respuesta se ignora)', hostSilent === 'NONE');
 
   const ended = await endedP;
-  ok('questionEnded solo incluye jugadores (sin anfitrión)', ended.results.length === 1 && ended.rightIndex === 0);
+  ok('questionEnded solo incluye jugadores (sin anfitrión)', ended.results.length === 1 && ended.rightIndex === a1Correct);
 
   // el anfitrión puede girar de NUEVO directamente (sin botón 'siguiente')
   host.emit('spin');
@@ -79,7 +90,9 @@ function once(sock, ev) { return new Promise(r => sock.once(ev, r)); }
   // respuesta mala del invitado -> -20 puntos
   const playersAfterWrong = new Promise((r) => host.once('players', d => r(d)));
   const guestAnswered2 = once(guest, 'answered');
-  guest.emit('answer', { qId: q3.qId, index: 1 });
+  const q3Correct = correctIdx(q3);
+  const q3Wrong = (q3Correct + 1) % q3.options.length;
+  guest.emit('answer', { qId: q3.qId, index: q3Wrong });
   const answeredMsg = await guestAnswered2;
   ok('respuesta mala -> -20 pts', answeredMsg.earned === -20);
   const lifePlayers = await playersAfterWrong;

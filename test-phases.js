@@ -1,10 +1,20 @@
 const { io } = require('socket.io-client');
+const { QUESTIONS } = require('./questions');
 const URL = process.env.URL || 'http://localhost:3000';
 
 const watchdog = setTimeout(() => { console.error('FATAL: timeout del test de fases'); process.exit(1); }, 90000);
 
 function wait(ms) { return new Promise(r => setTimeout(r, ms)); }
 function once(sock, ev) { return new Promise(r => sock.once(ev, r)); }
+
+// Con el orden de opciones mezclado, calcula la posición de la respuesta correcta en el payload recibido
+function correctIdx(qPayload) {
+  const dash = qPayload.qId.lastIndexOf('-');
+  const catId = qPayload.qId.slice(0, dash);
+  const qIndex = Number(qPayload.qId.slice(dash + 1));
+  const q = QUESTIONS[catId][qIndex];
+  return qPayload.options.indexOf(q.opts[q.a]);
+}
 
 function makeCollector(sock, ev) {
   const q = [];
@@ -48,14 +58,14 @@ function waitForPhase(target, ms) {
   host.emit('start');
   await once(host, 'started');
 
-  // ---- Fase 1: responder las 8 preguntas correctamente (todas tienen a:0) ----
+  // ---- Fase 1: responder las 8 preguntas correctamente (respuesta mezclada) ----
   let lastQuestion = null;
   for (let i = 0; i < 8; i++) {
     host.emit('spin');
     const q = await once(host, 'question');
     lastQuestion = q;
     if (i === 0) ok('la Fase 1 anuncia pregunta 1/8', q.round === 1 && q.total === 8);
-    guest.emit('answer', { qId: q.qId, index: 0 });
+    guest.emit('answer', { qId: q.qId, index: correctIdx(q) });
     await once(guest, 'questionEnded');
   }
   ok('se jugaron 8 preguntas de la Fase 1', lastQuestion.round === 8);
@@ -70,7 +80,7 @@ function waitForPhase(target, ms) {
     if (i === 0) ok('Fase 2 muestra una tarjeta con 4 categorías', Array.isArray(card.options) && card.options.length === 4);
     const guestP2 = once(guest, 'p2Answer');
     const reveal = once(guest, 'p2Reveal');
-    guest.emit('p2Classify', { cid: card.cid, catId: card.options[0].id });
+    guest.emit('p2Classify', { cid: card.cid, catId: card.cat });
     const ans = await guestP2;
     if (ans.earned === 50 || ans.earned === -30) earnedOk = true;
     await reveal;

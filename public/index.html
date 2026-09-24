@@ -136,16 +136,18 @@
 
   .p4top { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; font-size:15px; }
   .p4top .money { color:#ffd700; font-weight:900; }
+  .caseIntro { background:#20304f; border-left:4px solid #9b6dd6; border-radius:12px; padding:12px 15px; margin-bottom:12px; font-size:15px; line-height:1.6; color:#eaf1ff; text-align:left; }
   .shopitem { display:flex; justify-content:space-between; align-items:center; gap:10px; text-align:left; }
   .shopitem .sinfo { flex:1; }
   .shopitem .sname { font-weight:700; font-size:14px; }
   .shopitem .sdesc { color:#9fb4d8; font-size:11px; }
   .shopitem .sprice { color:#ffd700; font-weight:800; white-space:nowrap; }
   .bought { opacity:.5; }
-  .p4owned { margin-top:10px; font-size:12px; color:#9fb4d8; text-align:left; }
+  .p4owned { margin-top:10px; font-size:13px; color:#c9d9f0; text-align:left; }
 
-  .attackbox { border:1px dashed #e8a33d; border-radius:12px; padding:10px 12px; margin-bottom:10px; text-align:left; }
-  .attackbox .aname { color:#ffd700; font-weight:800; }
+  .attackbox { border:1px dashed #e8a33d; border-radius:12px; padding:12px 14px; margin-bottom:10px; text-align:left; }
+  .attackbox .aname { color:#ffd700; font-weight:800; font-size:16px; line-height:1.4; }
+  .atkdesc { font-size:15px; line-height:1.55; color:#eaf1ff; margin-top:6px; }
   .attackbox.outcome-ok { border-color:#1f9d55; background:rgba(31,157,85,.12); }
   .attackbox.outcome-bad { border-color:#d63044; background:rgba(214,48,68,.12); }
   .attackbox .outcome { font-weight:800; font-size:14px; }
@@ -237,8 +239,8 @@
     <div id="p3panel" class="panel">
       <div class="card">
         <span class="chip" id="p3Chip" style="background:#9b6dd6;">🕵️ Caza de Vulnerabilidades · Audita la Escena</span>
-        <div class="qtext" id="p3Title"></div>
-        <div class="muted" id="p3Intro" style="margin-bottom:10px;"></div>
+        <div class="qtext" id="p3Title" style="font-size:17px;"></div>
+        <div class="caseIntro" id="p3Intro"></div>
         <div class="opts" id="p3Controls"></div>
         <div class="row" style="margin-top:12px;">
           <button class="btn secondary" id="p3Reset" onclick="p3ResetPicks()">Limpiar</button>
@@ -255,7 +257,7 @@
         </div>
         <div id="p4AttackBox" class="attackbox">
           <span class="aname" id="p4AtkName">Preparando…</span>
-          <div class="muted" id="p4AtkDesc"></div>
+          <div class="atkdesc" id="p4AtkDesc"></div>
         </div>
         <div class="opts" id="p4Shop"></div>
         <div class="p4owned" id="p4Owned"></div>
@@ -476,6 +478,7 @@ socket.on('p2Card', (d) => {
     const b = document.createElement('button');
     b.className = 'opt p2opt';
     b.innerHTML = `<span>${esc(o.name)}</span><small>${esc(o.tip)}</small>`;
+    b.dataset.cat = o.id;
     b.onclick = () => p2Classify(o.id);
     optsEl.appendChild(b);
   });
@@ -493,7 +496,7 @@ socket.on('p2Reveal', (d) => {
   const correctIdx = optIdx(d.catId);
   btns.forEach((b, i) => {
     b.disabled = true;
-    b.classList.remove('mine-correct', 'mine-wrong');
+    b.classList.remove('selected', 'mine-correct', 'mine-wrong');
   });
   if (correctIdx >= 0 && btns[correctIdx]) btns[correctIdx].classList.add('correct');
   const mine = d.results.find(r => r.id === myId);
@@ -556,6 +559,13 @@ let p4ShopData = [];
 let p4StateByMe = { budget: 10000, purchased: [] };
 let p4AttackOpen = false;
 let p4ReadySent = false;
+let p4Cart = new Set(); // carrito de compra: se elige antes de pulsar el botón
+
+function p4CartTotal() {
+  let t = 0;
+  p4Cart.forEach(id => { const s = p4ShopData.find(x => x.id === id); if (s) t += s.price; });
+  return t;
+}
 
 function setP4ReadyBtn() {
   const b = $('p4ReadyBtn');
@@ -563,12 +573,18 @@ function setP4ReadyBtn() {
   if (isHost) { b.style.display = 'none'; return; }
   b.style.display = 'inline-block';
   b.disabled = p4ReadySent || !p4AttackOpen;
-  b.textContent = p4ReadySent ? '⏳ Esperando a los demás…' : '✔️ Listo, ejecutar ataque';
+  const total = p4CartTotal();
+  b.textContent = p4ReadySent
+    ? '⏳ Esperando a los demás…'
+    : (total > 0 ? `✔️ Comprar ($${total.toLocaleString('es')}) y ejecutar ataque` : '✔️ Listo, ejecutar ataque');
 }
 function p4Ready() {
   if (isHost || p4ReadySent || !p4AttackOpen) return;
   p4ReadySent = true;
   setP4ReadyBtn();
+  const cart = Array.from(p4Cart);
+  p4Cart.clear();
+  cart.forEach(cid => socket.emit('p4Buy', { cid }));
   renderP4Shop();
   socket.emit('p4Ready');
 }
@@ -577,19 +593,36 @@ function shopName(id) {
   const s = p4ShopData.find(x => x.id === id);
   return s ? s.name : id;
 }
+function p4Toggle(cid) {
+  if (isHost || p4ReadySent || !p4AttackOpen) return;
+  const s = p4ShopData.find(x => x.id === cid);
+  if (!s) return;
+  if (p4StateByMe.purchased.includes(cid)) return;
+  if (p4Cart.has(cid)) {
+    p4Cart.delete(cid);
+  } else {
+    if (s.price > p4StateByMe.budget - p4CartTotal()) return;
+    p4Cart.add(cid);
+  }
+  renderP4Shop();
+}
 function renderP4Shop() {
   const list = $('p4Shop');
   if (!list) return;
   list.innerHTML = '';
+  const total = p4CartTotal();
   p4ShopData.forEach(s => {
     const b = document.createElement('button');
     b.className = 'opt shopitem';
     const own = p4StateByMe.purchased.includes(s.id);
-    const afford = s.price <= p4StateByMe.budget;
-    b.innerHTML = `<span class="sinfo"><span class="sname">${own ? '✅ ' : ''}${esc(s.name)}</span><br><span class="sdesc">${esc(s.desc)}</span></span><span class="sprice">$${s.price.toLocaleString('es')}</span>`;
-    b.disabled = own || !afford || isHost || !p4AttackOpen || p4ReadySent;
+    const inCart = p4Cart.has(s.id);
+    const afford = !own && s.price <= p4StateByMe.budget - total;
+    const interactive = !own && !isHost && p4AttackOpen && !p4ReadySent;
+    b.innerHTML = `<span class="sinfo"><span class="sname">${own ? '✅ ' : inCart ? '🛒 ' : ''}${esc(s.name)}</span><br><span class="sdesc">${esc(s.desc)}</span></span><span class="sprice">$${s.price.toLocaleString('es')}</span>`;
+    b.disabled = !interactive || !afford;
     if (own) b.classList.add('bought');
-    if (!own && afford && !isHost && p4AttackOpen && !p4ReadySent) b.onclick = () => socket.emit('p4Buy', { cid: s.id });
+    if (inCart) b.classList.add('selected');
+    if (interactive && afford) b.onclick = () => p4Toggle(s.id);
     list.appendChild(b);
   });
   setP4ReadyBtn();
@@ -606,20 +639,22 @@ socket.on('p4Init', (d) => {
   p4ShopData = d.shop;
   p4AttackOpen = false;
   p4ReadySent = false;
+  p4Cart.clear();
   renderP4State(d.state);
   setP4ReadyBtn();
   $('p4AtkName').textContent = 'Preparando defensas…';
-  $('p4AtkDesc').textContent = 'Van a ocurrir 3 ataques en tiempo real. Cuando se anuncie uno, tendrás 90 s para comprar el control preventivo.';
+  $('p4AtkDesc').textContent = 'Van a ocurrir 3 ataques en tiempo real. Cuando se anuncie uno, tendrás 90 s para elegir los controles preventivos y darle a "Listo".';
   $('p4AttackBox').className = 'attackbox';
 });
 socket.on('p4Notify', (d) => {
   p4AttackOpen = true;
   p4ReadySent = false;
+  p4Cart.clear();
   $('p4AtkName').textContent = '⚠️ PRÓXIMO ATAQUE — ' + d.name;
-  $('p4AtkDesc').textContent = d.desc + ' | Mitiga con: ' + d.required.map(shopName).join(' o ');
+  $('p4AtkDesc').textContent = d.desc;
   $('p4AttackBox').className = 'attackbox';
   renderP4Shop();
-  startGameTimer(d.time, '🛡️ Compra el control preventivo antes del ataque');
+  startGameTimer(d.time, '🛡️ Elige los controles preventivos y pulsa "Listo"');
 });
 socket.on('p4Buy', (d) => {
   addFeed(`🛡️ ${esc(d.name)} compró un control (le quedan $${d.budget.toLocaleString('es')})`, '');
@@ -632,6 +667,7 @@ socket.on('p4Result', (d) => {
   stopGameTimer();
   p4AttackOpen = false;
   p4ReadySent = false;
+  p4Cart.clear();
   setP4ReadyBtn();
   const mineRes = d.results.find(r => r.id === myId);
   const mineMit = mineRes && mineRes.mitigated;
@@ -659,6 +695,7 @@ socket.on('p5Statement', (d) => {
     const b = document.createElement('button');
     b.className = 'opt';
     b.innerHTML = `${labels[v]}<small style="display:block;color:#9fb4d8;font-size:11px;">${hints[v]}</small>`;
+    b.dataset.vote = v;
     b.onclick = () => p5Vote(v);
     optsEl.appendChild(b);
   });
@@ -669,7 +706,7 @@ socket.on('p5Reveal', (d) => {
   stopGameTimer();
   const btns = document.querySelectorAll('#p5Opts .opt');
   const correctIdx = P5_VOTES.indexOf(d.answer);
-  btns.forEach(b => { b.disabled = true; b.classList.remove('mine-correct', 'mine-wrong'); });
+  btns.forEach(b => { b.disabled = true; b.classList.remove('selected', 'mine-correct', 'mine-wrong'); });
   if (correctIdx >= 0 && btns[correctIdx]) btns[correctIdx].classList.add('correct');
   const mine = d.results.find(r => r.id === myId);
   if (mine && mine.vote && !mine.correct) {
@@ -685,7 +722,11 @@ function setPhaseButtons(sel, enabled) { document.querySelectorAll(sel).forEach(
 function p2Classify(catId) {
   if (isHost || p2Answered || !p2Cid) return;
   p2Answered = true;
-  setPhaseButtons('#p2Opts .opt', false);
+  const bts = document.querySelectorAll('#p2Opts .opt');
+  bts.forEach(b => {
+    b.disabled = true;
+    if (b.dataset.cat === String(catId)) b.classList.add('selected');
+  });
   socket.emit('p2Classify', { cid: p2Cid, catId });
 }
 function p3Toggle(id, b) {
@@ -708,14 +749,18 @@ function p3Confirm() {
 function p5Vote(v) {
   if (isHost || p5Voted || !p5Sid) return;
   p5Voted = true;
-  setPhaseButtons('#p5Opts .opt', false);
+  const bts = document.querySelectorAll('#p5Opts .opt');
+  bts.forEach(b => {
+    b.disabled = true;
+    if (b.dataset.vote === v) b.classList.add('selected');
+  });
   socket.emit('p5Vote', { sid: p5Sid, vote: v });
 }
 
 socket.on('questionEnded', (d) => {
   stopGameTimer();
   const btns = document.querySelectorAll('#opts .opt');
-  btns.forEach((b) => b.disabled = true);
+  btns.forEach((b) => { b.disabled = true; b.classList.remove('selected'); });
   if (btns[d.rightIndex]) btns[d.rightIndex].classList.add('correct');
   const mine = d.results.find(r => r.id === myId);
   if (mine && !mine.correct && myChoseValue !== null && btns[myChoseValue]) btns[myChoseValue].classList.add('wrong');
@@ -797,7 +842,12 @@ function answer(i) {
   if (!currentQId) return;
   if (myChoseValue !== null) return;
   myChoseValue = i;
-  document.querySelectorAll('#opts .opt').forEach(b => b.disabled = true);
+  const bts = document.querySelectorAll('#opts .opt');
+  bts.forEach(b => b.disabled = true);
+  if (bts[i]) {
+    bts[i].classList.add('selected');
+    if (bts[i].textContent.indexOf('✓') === -1) bts[i].textContent = '✓ ' + bts[i].textContent;
+  }
   socket.emit('answer', { qId: currentQId, index: i });
 }
 function stopGameTimer() {

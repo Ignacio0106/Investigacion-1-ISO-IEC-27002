@@ -16,7 +16,7 @@ Juego **multijugador en línea** sobre la norma **ISO/IEC 27002**: una partida p
 | 1 | 🎯 **Preguntados** | Ronda de 8 preguntas con rueda de categorías. +100 el primero, +50 los demás, −20 si fallas (20 s). |
 | 2 | 🗂️ **Sorting Express** | Clasifica 8 controles en Organizacional / Personas / Físicos / Tecnológicos (30 s/tarjeta). +50 acierto, −30 fallo. |
 | 3 | 🕵️ **Caza de Vulnerabilidades** | Elige solo los controles adecuados para 2 casos prácticos (2 min). +30 correcto, −20 por omitir o por extra, +50 bono limpio. |
-| 4 | 🛡️ **SOC Manager** | Presupuesto de $10,000: compra controles y mitiga 3 ataques (90 s por ataque, con botón "Listo" para adelantar). +150 mitigar, −100 brecha + pérdida de presupuesto. |
+| 4 | 🛡️ **SOC Manager** | Presupuesto de $10,000 (se reinicia en cada ataque): elige controles y mitiga 3 ataques (90 s por ataque, con botón "Listo" para adelantar). +150 mitigar, −100 brecha + pérdida de presupuesto. |
 | 5 | 🗣️ **Debate Express** | Vota si cada afirmación es ventaja, limitación o mito (30 s). +40 acierto, −15 fallo. |
 
 Cada fase empieza con un anuncio y un temporizador en pantalla; el marcador en vivo se actualiza en todo momento.
