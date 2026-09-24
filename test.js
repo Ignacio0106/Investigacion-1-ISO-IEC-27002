@@ -15,7 +15,7 @@ function correctIdx(qPayload) {
   const q = QUESTIONS[catId][qIndex];
   return qPayload.options.indexOf(q.opts[q.a]);
 }
-
+ 
 (async () => {
   let failed = 0;
   const ok = (n, c) => { console.log((c ? 'PASS' : 'FAIL') + ' - ' + n); if (!c) failed++; };

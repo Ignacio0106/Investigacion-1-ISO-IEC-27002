@@ -128,7 +128,7 @@ function waitForPhase(target, ms) {
     if (i === 0) ok('con el control comprado se mitiga el ataque', me && me.mitigated === true && me.delta === 150);
   }
   ok('los 3 ataques se mitigan', mitigados === 3);
-
+ 
   ok('la partida avanza a la Fase 5', await waitForPhase(5, 8000));
 
   // ---- Fase 5: votar hasta que termine la partida ----

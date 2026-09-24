@@ -42,7 +42,7 @@ const P5_GOOD = 40;             // Fase 5: voto correcto
 const P5_BAD = 15;              // Fase 5: voto incorrecto
 
 // ---------- Utilidades ----------
-function genCode() {
+function genCode() { 
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   let code;
   do {
@@ -208,8 +208,8 @@ function p2Reveal(room) {
   io.to(room.code).emit('p2Reveal', { catId: card.cat, options: room.p2.options.map(o => ({ id: o.id, name: o.name, color: o.color })), results });
   broadcastRoom(room);
   room.p2.idx++;
-  if (room.p2.idx < room.p2.cards.length) later(room, () => { if (room.phase === 2 && room.p2) p2Send(room); }, 1800);
-  else startPhase(room, 3);
+  if (room.p2.idx < room.p2.cards.length) later(room, () => { if (room.phase === 2 && room.p2) p2Send(room); }, 2500);
+  else later(room, () => { if (room.phase === 2 && room.p2) startPhase(room, 3); }, 3000);
 }
 
 function scheduleNext(room, phase, ms) {
@@ -255,13 +255,13 @@ function p3Reveal(room) {
   for (const id of guestIds(room)) {
     const p = room.players.get(id);
     const sub = room.p3.submitted.get(id);
-    results.push({ id, name: p.name, earned: sub ? sub.earned : 0 });
+    results.push({ id, name: p.name, earned: sub ? sub.earned : 0, answered: !!sub });
   }
   io.to(room.code).emit('p3Reveal', { needed, results });
   broadcastRoom(room);
   room.p3.idx++;
-  if (room.p3.idx < room.p3.scenes.length) later(room, () => { if (room.phase === 3 && room.p3) p3Send(room); }, 2000);
-  else startPhase(room, 4);
+  if (room.p3.idx < room.p3.scenes.length) later(room, () => { if (room.phase === 3 && room.p3) p3Send(room); }, 2500);
+  else later(room, () => { if (room.phase === 3 && room.p3) startPhase(room, 4); }, 3000);
 }
 
 // ---------- Fase 4: SOC Manager ----------
@@ -335,7 +335,7 @@ function p4Resolve(room) {
   io.to(room.code).emit('p4State', { players: p4StateList(room) });
   broadcastRoom(room);
   room.p4.round++;
-  later(room, () => p4Next(room), 2500);
+  later(room, () => p4Next(room), 3000);
 }
 
 // ---------- Fase 5: Debate Express ----------
@@ -376,9 +376,9 @@ function p5Reveal(room) {
   io.to(room.code).emit('p5Reveal', { sid: item.sid, answer: item.answer, explanation: item.explanation, results });
   broadcastRoom(room);
   room.p5.idx++;
-  if (room.p5.idx < room.p5.items.length) later(room, () => { if (room.phase === 5 && room.p5) p5Send(room); }, 1500);
+  if (room.p5.idx < room.p5.items.length) later(room, () => { if (room.phase === 5 && room.p5) p5Send(room); }, 2500);
   else {
-    later(room, () => endGame(room, true), 2200);
+    later(room, () => { if (room.phase === 5 && room.p5) endGame(room, true); }, 3000);
   }
 }
 
@@ -392,13 +392,13 @@ function closeQuestion(room) {
   for (const [id, p] of room.players) {
     if (id === room.host) continue; // el anfitrión no juega
     const info = cur.answered.get(id);
-    results.push({ id, name: p.name, correct: !!(info && info.correct), earned: info ? info.earned : 0 });
+    results.push({ id, name: p.name, correct: !!(info && info.correct), earned: info ? info.earned : 0, answered: !!info });
   }
   io.to(room.code).emit('questionEnded', { rightIndex, results });
 
   if (remainingCount(room) === 0) { endGame(room, true); return; }
   if (room.phase === 1 && room.p1.count >= P1_QUESTION_COUNT) {
-    scheduleNext(room, 2, 2500);
+    scheduleNext(room, 2, 4000);
   }
 }
 

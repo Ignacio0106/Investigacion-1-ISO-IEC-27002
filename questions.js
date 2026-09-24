@@ -4,7 +4,7 @@ const CATS = [
   { id: 'funcionamiento', name: 'Funcionamiento', color: '#f0536b' },
   { id: 'caso', name: 'Caso Práctico', color: '#9b6dd6' },
   { id: 'ventajas', name: 'Ventajas y Limitaciones', color: '#e8a33d' }
-];
+]; 
 
 const QUESTIONS = {
   general: [

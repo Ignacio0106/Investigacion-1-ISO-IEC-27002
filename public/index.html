@@ -487,7 +487,7 @@ socket.on('p2Card', (d) => {
 });
 socket.on('p2Answer', (d) => {
   const pts = d.earned >= 0 ? '+' + d.earned : d.earned;
-  addFeed(`🗂️ ${esc(d.name)} ${d.correct ? 'clasificó bien' : 'falló'} (${pts} pts)`, d.correct ? 'good' : 'bad');
+  addFeed(`🗂️ ${esc(d.name)} ${d.correct ? 'acertó' : 'falló'} (${pts} pts)`, d.correct ? 'good' : 'bad');
 });
 socket.on('p2Reveal', (d) => {
   stopGameTimer();
@@ -505,7 +505,7 @@ socket.on('p2Reveal', (d) => {
     if (mi >= 0 && btns[mi]) btns[mi].classList.add('mine-wrong');
   }
   d.results.forEach(r => {
-    addFeed(`🗂️ ${esc(r.name)} ${r.correct ? 'acertó' : 'erró'} (${r.earned >= 0 ? '+' + r.earned : r.earned} pts)`, r.correct ? 'good' : 'bad');
+    if (!r.correct && r.earned === 0) addFeed(`🗂️ ${esc(r.name)} no respondió a tiempo (0 pts)`, 'bad');
   });
 });
 
@@ -551,7 +551,10 @@ socket.on('p3Reveal', (d) => {
       if (el) el.classList.add('wrong');
     }
   });
-  d.results.forEach(r => addFeed(`🕵️ ${esc(r.name)} obtuvo ${r.earned >= 0 ? '+' + r.earned : r.earned} pts`, r.earned >= 0 ? 'good' : 'bad'));
+  d.results.forEach(r => {
+    if (r.answered === false) addFeed(`🕵️ ${esc(r.name)} no respondió a tiempo (0 pts)`, 'bad');
+    else addFeed(`🕵️ ${esc(r.name)} obtuvo ${r.earned >= 0 ? '+' + r.earned : r.earned} pts`, r.earned >= 0 ? 'good' : 'bad');
+  });
 });
 
 // ---------- Fase 4: SOC Manager ----------
@@ -656,9 +659,7 @@ socket.on('p4Notify', (d) => {
   renderP4Shop();
   startGameTimer(d.time, '🛡️ Elige los controles preventivos y pulsa "Listo"');
 });
-socket.on('p4Buy', (d) => {
-  addFeed(`🛡️ ${esc(d.name)} compró un control (le quedan $${d.budget.toLocaleString('es')})`, '');
-});
+socket.on('p4Buy', () => {});
 socket.on('p4Ready', (d) => {
   addFeed(`🛡️ ${esc(d.name)} está listo para el ataque`, '');
 });
@@ -713,8 +714,10 @@ socket.on('p5Reveal', (d) => {
     const mi = P5_VOTES.indexOf(mine.vote);
     if (mi >= 0 && btns[mi]) btns[mi].classList.add('mine-wrong');
   }
-  d.results.forEach(r => addFeed(`🗣️ ${esc(r.name)} votó ${r.vote || '—'} (${r.earned >= 0 ? '+' + r.earned : r.earned} pts)`, r.correct ? 'good' : 'bad'));
-  addFeed('💡 Correcto: ' + d.answer + '. ' + d.explanation, 'first');
+  d.results.forEach(r => {
+    if (!r.correct && r.earned === 0) addFeed(`🗣️ ${esc(r.name)} no respondió a tiempo (0 pts)`, 'bad');
+    else addFeed(`🗣️ ${esc(r.name)} ${r.correct ? 'acertó' : 'falló'} (${r.earned >= 0 ? '+' + r.earned : r.earned} pts)`, r.correct ? 'good' : 'bad');
+  });
 });
 
 // ---------- Acciones de fases ----------
@@ -764,6 +767,9 @@ socket.on('questionEnded', (d) => {
   if (btns[d.rightIndex]) btns[d.rightIndex].classList.add('correct');
   const mine = d.results.find(r => r.id === myId);
   if (mine && !mine.correct && myChoseValue !== null && btns[myChoseValue]) btns[myChoseValue].classList.add('wrong');
+  d.results.forEach(r => {
+    if (r.answered === false) addFeed(`🎯 ${esc(r.name)} no respondió a tiempo (0 pts)`, 'bad');
+  });
   questionActive = false;
   updateSpinBtn(); // el anfitrión puede girar de nuevo
 });
